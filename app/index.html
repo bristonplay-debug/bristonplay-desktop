@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>BristonPlay</title>
+<link rel="stylesheet" href="css/app.css">
+<style id="accent-style"></style>
+</head>
+<body>
+<div id="stage">
+  <video id="video" style="display:none"></video>
+  <div id="screens"></div>
+  <div id="toast"></div>
+</div>
+<script src="../node_modules/hls.js/dist/hls.min.js"></script>
+<script src="../node_modules/mpegts.js/dist/mpegts.js"></script>
+<script src="js/config.js"></script>
+<script src="js/util.js"></script>
+<script src="js/device.js"></script>
+<script src="js/m3u.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+<script>App.boot();</script>
+</body>
+</html>

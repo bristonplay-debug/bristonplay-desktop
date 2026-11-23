@@ -1,0 +1,50 @@
+{
+  "name": "bristonplay-desktop",
+  "productName": "BristonPlay",
+  "version": "1.0.0",
+  "description": "BristonPlay para computador (Windows e Mac)",
+  "author": "BristonPlay <bristonplay@gmail.com>",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "hls.js": "^1.5.0",
+    "mpegts.js": "^1.7.3"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.bristonplay.desktop",
+    "productName": "BristonPlay",
+    "copyright": "BristonPlay",
+    "files": ["main.js", "preload.js", "app/**/*", "node_modules/hls.js/dist/hls.min.js", "node_modules/mpegts.js/dist/mpegts.js", "package.json"],
+    "directories": { "buildResources": "build", "output": "dist" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "BristonPlay-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BristonPlay",
+      "language": "1046"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "category": "public.app-category.entertainment",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "BristonPlay-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": { "title": "BristonPlay" },
+    "publish": { "provider": "github", "releaseType": "release" }
+  }
+}
