@@ -75,16 +75,37 @@ var App = (function () {
     }
   }
 
+  /** O servidor BristonPlay avisa quando o catálogo muda (/v.php): recarrega a lista sem reiniciar o app */
+  function catalogVersion(url) {
+    return new Promise(function (ok) {
+      var m = /^(https?:\/\/[^\/]+)/i.exec(url || ""); if (!m) return ok(null);
+      var x = new XMLHttpRequest(); x.open("GET", m[1] + "/v.php", true); x.timeout = 8000;
+      x.onload = function () { try { var j = JSON.parse(x.responseText); ok(typeof j.v === "number" ? j.v : null); } catch (e) { ok(null); } };
+      x.onerror = x.ontimeout = function () { ok(null); };
+      try { x.send(); } catch (e) { ok(null); }
+    });
+  }
+  function checkCatalog() {
+    var url = state.playlistUrl; if (!url) return;
+    catalogVersion(url).then(function (v) {
+      if (v == null) return;
+      if (state.catV == null) { state.catV = v; return; }
+      if (v !== state.catV) { state.catV = v; UI.toast("Sua lista foi atualizada. Recarregando…"); loadPlaylist(url); }
+    });
+  }
+
   function scheduleCheck() {
     clearInterval(state.checkTimer);
+    state.catV = null; setTimeout(checkCatalog, 5000);
     state.checkTimer = setInterval(function () {
       Device.check(state.id).then(function (res) {
         var was = state.res && state.res.status;
         state.res = res;
         if (res.status !== "active" || was !== "active") { state.cat = null; Video.stop(); handleResponse(res); }
         else if (res.playlist && res.playlist.m3u_url !== state.playlistUrl) { UI.toast("Sua lista foi atualizada. Recarregando…"); loadPlaylist(res.playlist.m3u_url); }
+        else checkCatalog();
       }).catch(function () { /* sem internet: tenta de novo depois */ });
-    }, 30 * 60 * 1000);
+    }, 10 * 60 * 1000);
   }
 
   // ============================================================ ativação / vencido / bloqueado
@@ -209,7 +230,7 @@ var App = (function () {
 
   // ============================================================ tela principal
   var TABS = [
-    { id: "tv", label: "TV ao vivo" }, { id: "home", label: "Destaques" }, { id: "movies", label: "Filmes" }, { id: "series", label: "Séries" },
+    { id: "tv", label: "TV ao vivo" }, { id: "home", label: "Destaques" }, { id: "futebol", label: "&#9917; FUTEBOL" }, { id: "movies", label: "Filmes" }, { id: "series", label: "Séries" },
     { id: "kids", label: "Kids" }, { id: "anime", label: "Anime" }, { id: "fav", label: "Favoritos" },
     { id: "search", label: "Buscar" }, { id: "settings", label: "Ajustes" },
   ];
@@ -229,6 +250,28 @@ var App = (function () {
     return { groups: out, lockedAdult: hasAdult };
   }
 
+  /** Procura uma pasta pelo nome (primeiro o nome exato, depois quem contém o nome) */
+  function findGroup(names, kinds) {
+    kinds = kinds || ["L", "M", "S"];
+    var c = state.cat; if (!c) return null;
+    for (var pass = 0; pass < 2; pass++) {
+      for (var n = 0; n < names.length; n++) {
+        var k = U.norm(names[n]); if (!k) continue;
+        for (var j = 0; j < kinds.length; j++) {
+          var gs = c.groups[kinds[j]];
+          for (var i = 0; i < gs.length; i++) {
+            var gn = U.norm(gs[i].name);
+            if (pass === 0 ? gn === k : gn.indexOf(k) >= 0) {
+              if (gs[i].adult && !CFG.allowAdult) continue;
+              return gs[i];
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   function Home() {
     var self = this;
     var el = this.el = U.h("div", "screen home glow");
@@ -241,6 +284,7 @@ var App = (function () {
     this.tab = 0; this.zone = "tabs";
     // Kids e Anime só aparecem se a lista tiver pastas para elas (aba vazia confunde o usuário)
     this.tabs = TABS.filter(function (t) {
+      if (t.id === "futebol") return !!findGroup(["FUTEBOL"]);
       return (t.id !== "kids" && t.id !== "anime") || visibleGroups(["M", "S"], t.id).groups.length > 0;
     });
     el.querySelector(".exp").innerHTML = state.res.expires_at ? "Válido até " + U.fmtDate(state.res.expires_at) : "";
@@ -289,6 +333,11 @@ var App = (function () {
     var id = this.tabs[i].id;
     if (id === "tv") this.view = new TvView(this);
     else if (id === "home") this.view = new DestaquesView(this);
+    else if (id === "futebol") {
+      var fg = findGroup(["FUTEBOL"]);
+      if (fg && fg.kind === "L") this.view = new TvView(this, fg);
+      else this.view = new VodView(this, ["M", "S"], null, "Futebol", fg);
+    }
     else if (id === "movies") this.view = new VodView(this, ["M"], null, "Filmes");
     else if (id === "series") this.view = new VodView(this, ["S"], null, "Séries");
     else if (id === "kids") this.view = new VodView(this, ["M", "S"], "kids", "Kids");
@@ -341,9 +390,9 @@ var App = (function () {
   }
 
   // ------------------------------------------------------------ TV ao vivo
-  function TvView(home) {
+  function TvView(home, only) {
     var self = this;
-    this.home = home;
+    this.home = home; this.only = only || null;
     var b = home.body;
     b.innerHTML = '<div class="col groups"></div><div class="col channels"></div><div class="col preview"><div class="pbox"><div class="pmsg dim">Escolha um canal na lista</div><div class="live-tag">AO VIVO</div></div><div class="pinfo"></div></div>';
     this.pbox = b.querySelector(".pbox"); this.pinfo = b.querySelector(".pinfo"); this.pmsg = b.querySelector(".pmsg");
@@ -374,6 +423,7 @@ var App = (function () {
     this.digits = "";
   }
   TvView.prototype.reloadGroups = function () {
+    if (this.only) { this.glist.set([this.only], true); this.selectGroup(this.only); return; }
     var v = visibleGroups(["L"]);
     var all = []; for (var i = 0; i < v.groups.length; i++) all = all.concat(v.groups[i].items);
     var favCh = favs().filter(function (f) { return f.t === "L"; }).map(resolveFav).filter(Boolean);
@@ -458,9 +508,9 @@ var App = (function () {
   };
 
   // ------------------------------------------------------------ Filmes / Séries / Kids / Anime
-  function VodView(home, kinds, tab, title) {
+  function VodView(home, kinds, tab, title, only) {
     var self = this;
-    this.home = home; this.kinds = kinds; this.tabId = tab;
+    this.home = home; this.kinds = kinds; this.tabId = tab; this.only = only || null;
     var b = home.body;
     b.innerHTML = '<div class="col groups"></div><div class="col content"></div>';
     this.glist = new UI.VList({
@@ -480,6 +530,7 @@ var App = (function () {
     home.hint.innerHTML = "Clique ou Enter: abrir · F: favoritar · PgUp/PgDn: pular página";
   }
   VodView.prototype.reload = function () {
+    if (this.only) { this.glist.set([this.only], true); this.selectGroup(this.only); return; }
     var v = visibleGroups(this.kinds, this.tabId);
     var all = []; for (var i = 0; i < v.groups.length; i++) all = all.concat(v.groups[i].items);
     var gs = [{ special: true, label: "Todos", items: all, count: all.length }].concat(v.groups);
@@ -520,9 +571,12 @@ var App = (function () {
       ? banners.map(function (x) { return { img: x.image_url, title: x.title || "", sub: x.subtitle || "", badge: x.badge || "Filme em destaque", name: x.action_value || x.title }; })
       : recent.slice(0, 5).map(function (m) { return { img: m.l, title: m.n, sub: m.g, badge: "Filme em destaque", item: m }; });
     this.cards = [{ it: dubbed, badge: "Dublado" }, { it: series, badge: "Série em destaque" }];
-    var sc = [["&#128250;", "Canais ao vivo", "tv"], ["&#127916;", "Filmes", "movies"], ["&#127902;", "Séries completas", "series"]];
-    if (home.indexOf("kids") && home.tabs[home.indexOf("kids")].id === "kids") sc.push(["&#129528;", "Kids infantil", "kids"]);
-    if (home.indexOf("anime") && home.tabs[home.indexOf("anime")].id === "anime") sc.push(["&#10024;", "Anime dublado", "anime"]);
+    var im = function (n) { return '<img src="img/tile_' + n + '.png" alt="">'; };
+    var sc = [[im("tv"), "Canais ao vivo", "tv"], [im("filmes"), "Filmes", "movies"], [im("series"), "Séries completas", "series"]];
+    if (home.indexOf("kids") && home.tabs[home.indexOf("kids")].id === "kids") sc.push([im("kids"), "Kids infantil", "kids"]);
+    if (home.indexOf("anime") && home.tabs[home.indexOf("anime")].id === "anime") sc.push(['<span class="dsce accent">&#10024;</span>', "Anime dublado", "anime"]);
+    var esp = findGroup(["Esportes", "Canais - Esportes", "Esporte"], ["L"]);
+    if (esp) sc.push([im("esportes"), "Esportes ao vivo", function () { home.goTab("tv"); var v = home.view; if (v && v.glist) { v.glist.set([esp], true); v.selectGroup(esp); } }]);
     this.shortcuts = sc;
     this.slide = 0; this.f = 0; this.active = false;
 
@@ -588,7 +642,8 @@ var App = (function () {
     } else if (f <= 2) {
       var it = this.cards[f - 1].it; if (it) openItem(it);
     } else {
-      this.home.goTab(this.shortcuts[f - 3][2]);
+      var a = this.shortcuts[f - 3][2];
+      if (typeof a === "function") a(); else this.home.goTab(a);
     }
   };
   DestaquesView.prototype.firstZone = function () { return "content"; };

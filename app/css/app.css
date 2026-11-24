@@ -162,10 +162,12 @@ p { font-size: 28px; margin: 8px 0; }
 .ddots i.on { background: #fff; width: 30px; }
 .dempty { position: absolute; left: 0; right: 0; top: 45%; text-align: center; font-size: 28px; }
 .dshort { display: -webkit-flex; display: flex; margin-top: 26px; height: 150px; }
-.dsc { -webkit-flex: 1; flex: 1; margin-right: 18px; border-radius: 16px; background: #15151b; border: 3px solid transparent; text-align: center; padding-top: 22px; box-sizing: border-box; }
+.dsc { -webkit-flex: 1; flex: 1; margin-right: 18px; border-radius: 16px; background: #15151b; border: 3px solid transparent; text-align: center; padding-top: 20px; box-sizing: border-box; }
 .dsc:last-child { margin-right: 0; }
-.dsci { font-size: 46px; line-height: 56px; }
-.dscl { font-size: 26px; font-weight: 600; margin-top: 8px; }
+.dsci { height: 64px; line-height: 64px; }
+.dsci img { width: 64px; height: 64px; border-radius: 12px; vertical-align: middle; }
+.dsce { font-size: 44px; }
+.dscl { font-size: 21px; font-weight: 700; margin-top: 8px; padding: 0 6px; }
 .dfoot { margin-top: 26px; height: 70px; border-radius: 14px; background: rgba(0,0,0,.4); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; padding: 0 26px; font-size: 26px; }
 .dfr { margin-left: auto; }
 .hd { display: inline-block; margin-left: 12px; background: #2a2a33; color: #ddd; font-size: 20px; padding: 3px 10px; border-radius: 6px; font-weight: 700; }
