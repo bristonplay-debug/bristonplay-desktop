@@ -261,30 +261,67 @@ var UI = (function () {
     init: function () {
       var v = this.el = document.getElementById("video");
       var self = this;
+      // player do YouTube (página do servidor com o player oficial embutido)
+      var f = this.yf = document.createElement("iframe");
+      f.id = "ytframe"; f.setAttribute("allow", "autoplay; encrypted-media; fullscreen; picture-in-picture"); f.setAttribute("allowfullscreen", "");
+      f.setAttribute("frameborder", "0"); f.style.cssText = "position:absolute;z-index:5;border:0;background:#000;display:none";
+      v.parentNode.insertBefore(f, v.nextSibling);
+      this.yt = false;
       v.addEventListener("ended", function () { if (self.onEnded) self.onEnded(); });
-      v.addEventListener("error", function () { if (self.onError) self.onError(); });
+      v.addEventListener("error", function () { if (!self.url || self.yt) return; if (self.eng) { if (self.onError) self.onError(); return; } self.fail(); });
     },
     eng: null,
     /** Escolhe o motor: .m3u8 = hls.js, mp4/mkv/etc = nativo, resto (canais .ts / sem extensão) = mpegts.js */
     kind: function (url) {
       var p = String(url).split("?")[0].toLowerCase();
+      if (/\.youtube$/.test(p)) return "yt";
       if (/\.m3u8$/.test(p)) return window.Hls && window.Hls.isSupported() ? "hls" : "native";
       if (/\.(mp4|m4v|mkv|webm|mov|avi|mp3|aac)$/.test(p)) return "native";
       return window.mpegts && window.mpegts.isSupported() ? "ts" : "native";
     },
     killEngine: function () {
+      if (this.yt) { this.yt = false; try { this.yf.src = "about:blank"; } catch (x) { /* */ } this.yf.style.display = "none"; }
       var e = this.eng; this.eng = null;
       if (!e) return;
       try { if (e.destroy) e.destroy(); } catch (x) { /* */ }
       try { if (e.unload) e.unload(); if (e.detachMediaElement) e.detachMediaElement(); } catch (x) { /* */ }
     },
-    fail: function () { if (this.onError) this.onError(); },
+    /** Se o formato não abrir, tenta sozinho o outro leitor (HLS <-> TS/arquivo) antes de mostrar erro */
+    fail: function () {
+      if (!this.alt && this.url && !this.yt) {
+        this.alt = true;
+        var url = this.url, v = this.el, cur = this.cur;
+        this.killEngine();
+        try { v.removeAttribute("src"); v.load(); } catch (x) { /* */ }
+        var self = this;
+        if (cur !== "hls" && window.Hls && window.Hls.isSupported()) {
+          this.cur = "hls";
+          var hls = this.eng = new window.Hls({ enableWorker: true });
+          hls.on(window.Hls.Events.ERROR, function (ev, d) { if (d && d.fatal) self.fail(); });
+          hls.loadSource(url); hls.attachMedia(v);
+        } else if (cur === "hls" && window.mpegts && window.mpegts.isSupported()) {
+          this.cur = "ts";
+          var pl = this.eng = window.mpegts.createPlayer({ type: "mpegts", isLive: true, url: url }, { enableWorker: true });
+          pl.on(window.mpegts.Events.ERROR, function () { self.fail(); });
+          pl.attachMediaElement(v); pl.load();
+        } else { if (this.onError) this.onError(); return; }
+        var p = v.play(); if (p && p.catch) p.catch(function () { /* */ });
+        return;
+      }
+      if (this.onError) this.onError();
+    },
     play: function (url, startSec) {
       var v = this.el, self = this;
       if (this.url !== url) {
         this.url = url;
         this.killEngine();
         var k = this.kind(url);
+        this.alt = false; this.cur = k;
+        if (k === "yt") {
+          try { v.pause(); v.removeAttribute("src"); v.load(); } catch (x) { /* */ }
+          this.yt = true; this.yf.src = url; this.syncYt();
+          return;
+        }
         if (k === "hls") {
           var hls = this.eng = new window.Hls({ enableWorker: true, lowLatencyMode: false });
           hls.on(window.Hls.Events.ERROR, function (ev, d) {
@@ -307,8 +344,19 @@ var UI = (function () {
           v.addEventListener("loadedmetadata", once);
         }
       }
+      if (this.yt) return;
       var p = v.play(); if (p && p.catch) p.catch(function () { /* autoplay */ });
     },
+    /** Mostra o player do YouTube no mesmo lugar do vídeo */
+    syncYt: function () {
+      var v = this.el, f = this.yf;
+      if (!this.yt || this.mode === "off") { f.style.display = "none"; return; }
+      f.style.left = v.style.left; f.style.top = v.style.top; f.style.width = v.style.width; f.style.height = v.style.height;
+      f.style.borderRadius = this.mode === "full" ? "0" : "16px";
+      f.style.display = "block"; v.style.display = "none";
+    },
+    /** Envia uma tecla do controle para o player do YouTube (play/pausa, avançar, voltar) */
+    ytKey: function (k) { try { this.yf.contentWindow.postMessage({ bpKey: k }, "*"); } catch (x) { /* */ } },
     stop: function () {
       var v = this.el; this.url = null;
       try { v.pause(); } catch (e) { /* */ }
@@ -320,7 +368,7 @@ var UI = (function () {
     /** "off" | "full" | elemento (encaixa o vídeo na área desse elemento) */
     place: function (where) {
       var v = this.el;
-      if (where === "off") { v.style.display = "none"; this.mode = "off"; return; }
+      if (where === "off") { v.style.display = "none"; this.mode = "off"; this.syncYt(); return; }
       v.style.display = "block";
       if (where === "full") {
         v.style.left = "0px"; v.style.top = "0px"; v.style.width = "1920px"; v.style.height = "1080px";
@@ -332,6 +380,7 @@ var UI = (function () {
         v.style.width = Math.round(r.width / sc) + "px"; v.style.height = Math.round(r.height / sc) + "px";
         this.mode = "box"; v.className = "box";
       }
+      this.syncYt();
     },
   };
 

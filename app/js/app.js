@@ -924,6 +924,14 @@ var App = (function () {
       if (code === K.UP || code === K.CHUP) { this.idx = (this.idx - 1 + this.o.list.length) % this.o.list.length; this.start(0); return true; }
       if (code === K.DOWN || code === K.CHDOWN) { this.idx = (this.idx + 1) % this.o.list.length; this.start(0); return true; }
       if (code === K.RED || code === K.YELLOW) { toggleFav(this.item()); return true; }
+      if (UI.Video.yt && (code === K.ENTER || code === K.PLAY || code === K.PAUSE)) UI.Video.ytKey("pp");
+      this.showOsd(); return true;
+    }
+    if (UI.Video.yt) {
+      // vídeo do YouTube: as teclas vão para o player do YouTube
+      if (code === K.ENTER || code === K.PLAY || code === K.PAUSE || code === 10252) UI.Video.ytKey("pp");
+      else if (code === K.LEFT || code === K.RW) UI.Video.ytKey("rw");
+      else if (code === K.RIGHT || code === K.FF) UI.Video.ytKey("ff");
       this.showOsd(); return true;
     }
     if (code === K.ENTER || code === K.PLAY || code === K.PAUSE || code === 10252) {
