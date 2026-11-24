@@ -2,8 +2,8 @@
 window.BP_CONFIG = {
   appName: "BristonPlay",
   appId: "com.bristonplay.desktop",
-  version: "1.0.2",
-  versionCode: 3,
+  version: "1.0.3",
+  versionCode: 4,
   defaultAccent: "#E50914",
   allowAdult: true, // computador: igual ao Android (adultos protegidos por PIN)
   apiBase: "https://qywznpcxhelhynbtbzuv.supabase.co/functions/v1",

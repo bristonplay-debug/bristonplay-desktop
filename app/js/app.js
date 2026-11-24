@@ -566,11 +566,22 @@ var App = (function () {
     for (var i = 0; i < recent.length; i++) if (reDub.test(U.norm(recent[i].n + " " + recent[i].g))) { dubbed = recent[i]; break; }
     if (!dubbed) dubbed = recent[6] || recent[0] || null;
     var series = c.series.length ? c.series[c.series.length - 1] : null;
+    // destaques escolhidos pelas categorias: Lançamentos (banner), Ação (1º quadro), Netflix (séries)
+    var withImg = function (g) { return g ? g.items.filter(function (x) { return x.l; }).slice(0, 15) : []; };
+    var launches = withImg(findGroup(["FILMES: LANÇAMENTOS", "Lançamentos", "Lancamento"], ["M"]));
+    this.action = withImg(findGroup(["FILMES: AÇÃO", "Ação", "Acao"], ["M"]));
+    this.netflix = withImg(findGroup(["SÉRIES: NETFLIX", "Netflix"], ["S"]));
+    this.rot = 0;
     var banners = (state.res.banners || []).filter(function (x) { return x && x.image_url; });
-    this.slides = banners.length
+    this.slides = launches.length
+      ? launches.slice(0, 10).map(function (m) { return { img: m.l, title: m.n, sub: m.g, badge: "Lançamento", item: m }; })
+      : banners.length
       ? banners.map(function (x) { return { img: x.image_url, title: x.title || "", sub: x.subtitle || "", badge: x.badge || "Filme em destaque", name: x.action_value || x.title }; })
       : recent.slice(0, 5).map(function (m) { return { img: m.l, title: m.n, sub: m.g, badge: "Filme em destaque", item: m }; });
-    this.cards = [{ it: dubbed, badge: "Dublado" }, { it: series, badge: "Série em destaque" }];
+    this.cards = [
+      { it: this.action.length ? this.action[0] : dubbed, badge: this.action.length ? "Ação" : "Dublado" },
+      { it: this.netflix.length ? this.netflix[0] : series, badge: this.netflix.length ? "Netflix" : "Série em destaque" },
+    ];
     var im = function (n) { return '<img src="img/tile_' + n + '.png" alt="">'; };
     var sc = [[im("tv"), "Canais ao vivo", "tv"], [im("filmes"), "Filmes", "movies"], [im("series"), "Séries completas", "series"]];
     if (home.indexOf("kids") && home.tabs[home.indexOf("kids")].id === "kids") sc.push([im("kids"), "Kids infantil", "kids"]);
@@ -591,7 +602,17 @@ var App = (function () {
     home.body.innerHTML = html;
     this.root = home.body.querySelector(".dest");
     this.drawCards(); this.drawBanner(); this.drawFocus();
-    this.timer = setInterval(function () { if (self.slides.length > 1) { self.slide = (self.slide + 1) % self.slides.length; self.drawBanner(); } }, 6000);
+    this.timer = setInterval(function () {
+      if (self.slides.length > 1) { self.slide = (self.slide + 1) % self.slides.length; self.drawBanner(); }
+      // os quadros da direita trocam de título a cada 2 voltas do banner
+      self.rot++;
+      if (self.rot % 2 === 0 && (self.action.length > 1 || self.netflix.length > 1)) {
+        var r = self.rot / 2;
+        if (self.action.length > 1) self.cards[0].it = self.action[r % self.action.length];
+        if (self.netflix.length > 1) self.cards[1].it = self.netflix[(r + 1) % self.netflix.length];
+        self.drawCards(); self.drawFocus();
+      }
+    }, 6000);
     // Magic Remote
     this.root.addEventListener("mouseover", function (ev) {
       var el = UI.up(ev.target, "dfx", self.root) || findF(ev.target); if (!el) return;
