@@ -824,6 +824,41 @@ var App = (function () {
   SettingsView.prototype.zone = function (z) { this.z = z; this.btns.focus(z === "content"); };
   SettingsView.prototype.key = function (code) { if (this.z !== "content") return false; return this.btns.key(code); };
 
+
+  // ============================================================ sinopse (servidor BristonPlay -> TMDB)
+  var infoMem = {};
+  function fetchInfo(name, tv, cb) {
+    var k = (tv ? "tv:" : "mv:") + name;
+    if (infoMem[k]) return cb(infoMem[k]);
+    var saved = U.get("info." + k, null);
+    if (saved && saved.at && Date.now() - saved.at < 15 * 86400000) { infoMem[k] = saved; return cb(saved); }
+    var x = new XMLHttpRequest();
+    x.open("GET", "http://bristonplay.top/info.php?t=" + (tv ? "tv" : "movie") + "&q=" + encodeURIComponent(name), true);
+    x.timeout = 12000;
+    x.onload = function () {
+      try {
+        var j = JSON.parse(x.responseText);
+        if (j && j.ok) { j.at = Date.now(); infoMem[k] = j; U.set("info." + k, j); cb(j); }
+      } catch (e) { /* */ }
+    };
+    try { x.send(); } catch (e) { /* */ }
+  }
+  function fillInfo(el, name, tv) {
+    var box = el.querySelector(".syn"); if (!box) return;
+    box.innerHTML = '<span class="faint">Carregando sinopse…</span>';
+    var done = false;
+    setTimeout(function () { if (!done && box.innerHTML.indexOf("Carregando") >= 0) box.innerHTML = '<span class="faint">Sinopse não disponível.</span>'; }, 13000);
+    fetchInfo(name, tv, function (j) {
+      done = true;
+      var meta = [];
+      if (j.year) meta.push(U.esc(j.year));
+      if (j.rating) meta.push("★ " + U.esc(String(j.rating)));
+      box.innerHTML = (meta.length ? '<div class="synmeta">' + meta.join("  ·  ") + "</div>" : "") +
+        '<div class="syntxt">' + U.esc(j.overview || "Sinopse não disponível.") + "</div>" +
+        (j.overview ? '<div class="tmdbc">Sinopse: TMDB — este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.</div>' : "");
+    });
+  }
+
   // ============================================================ detalhes do filme
   function MovieScreen(it) {
     var self = this;
@@ -832,7 +867,7 @@ var App = (function () {
     this.draw = function () {
       var pos = getPos(it.u);
       el.innerHTML = '<div class="dposter">' + (it.l ? '<img src="' + U.esc(it.l) + '"/>' : "") + '</div><div class="dinfo"><div class="faint">' + U.esc(it.g) +
-        '</div><h1>' + U.esc(it.n) + "</h1>" + (pos ? '<p class="dim">Você parou em ' + U.fmtTime(pos) + "</p>" : "") + '<div class="btns"></div></div>';
+        '</div><h1>' + U.esc(it.n) + "</h1>" + (pos ? '<p class="dim">Você parou em ' + U.fmtTime(pos) + "</p>" : "") + '<div class="syn"></div><div class="btns"></div></div>';
       var labels = pos ? ["▶ Continuar", "Do início"] : ["▶ Assistir"];
       labels.push(isFav(it) ? "★ Nos favoritos" : "☆ Favoritar");
       self.btns = new UI.Buttons(el.querySelector(".btns"), labels, function (i) {
@@ -843,6 +878,7 @@ var App = (function () {
       });
       self.btns.focus(true);
       UI.backButton(el, function () { UI.pop(); });
+      fillInfo(el, it.n, false);
     };
     this.draw();
   }
@@ -859,7 +895,7 @@ var App = (function () {
     this.seasons = seasons;
     var el = this.el = U.h("div", "screen details series glow");
     el.innerHTML = '<div class="dposter">' + (s.l ? '<img src="' + U.esc(s.l) + '"/>' : "") + '</div><div class="dinfo"><div class="faint">' + U.esc(s.g) +
-      "</div><h1>" + U.esc(s.n) + '</h1><div class="seasons"></div><div class="eps"></div><div class="favbtn"></div></div>';
+      "</div><h1>" + U.esc(s.n) + '</h1><div class="syn"></div><div class="seasons"></div><div class="eps"></div><div class="favbtn"></div></div>';
     this.sbtns = new UI.Buttons(el.querySelector(".seasons"), seasons.map(function (n) { return "Temporada " + n; }), function () { self.setZone("eps"); });
     var origKey = this.sbtns.key;
     this.sbtns.key = function (code) { var r = origKey.call(self.sbtns, code); if (r && (code === K.LEFT || code === K.RIGHT)) self.fillEps(); return r; };
@@ -879,6 +915,7 @@ var App = (function () {
     this.favBtn = el.querySelector(".favbtn");
     this.favBtn.addEventListener("click", function () { toggleFav(s); self.drawFav(); });
     UI.backButton(el, function () { UI.pop(); });
+    fillInfo(el, s.n, true);
     this.fillEps();
     this.setZone(seasons.length > 1 ? "seasons" : "eps");
   }

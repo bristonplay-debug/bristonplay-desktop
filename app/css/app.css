@@ -172,3 +172,10 @@ p { font-size: 28px; margin: 8px 0; }
 .dfr { margin-left: auto; }
 .hd { display: inline-block; margin-left: 12px; background: #2a2a33; color: #ddd; font-size: 20px; padding: 3px 10px; border-radius: 6px; font-weight: 700; }
 .dbanner.focus, .dcard.focus, .dsc.focus { border-color: #fff; }
+
+/* sinopse */
+.syn{max-width:980px;margin:6px 0 14px}
+.syn .synmeta{color:#cfcfda;font-weight:700;margin-bottom:6px}
+.syn .syntxt{color:#b9b9c6;line-height:1.45;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.series .syn .syntxt{-webkit-line-clamp:3}
+.syn .tmdbc{color:#6f6f80;font-size:.7em;margin-top:6px}

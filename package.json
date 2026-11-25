@@ -1,7 +1,7 @@
 {
   "name": "bristonplay-desktop",
   "productName": "BristonPlay",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "BristonPlay para computador (Windows e Mac)",
   "author": "BristonPlay <bristonplay@gmail.com>",
   "main": "main.js",
